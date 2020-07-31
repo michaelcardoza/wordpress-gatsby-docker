@@ -1,0 +1,72 @@
+version: '3'
+
+services:
+
+  database:
+    image: mysql:latest
+    container_name: ${APP_NAME}_database
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+
+  # Change permissions of the wp-content folder
+    # docker exec -ti [CONTAINER NAME] sh -c "chown -R www-data:www-data wp-content"
+  wordpress:
+    image: wordpress:${WP_VERSION}
+    container_name: ${APP_NAME}_wordpress
+    volumes:
+      - wp_data:/var/www/html
+      - "./config/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini"
+      - "./app:/var/www/html/wp-content/themes/custom-theme:rw"
+    ports:
+      - 80:80
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: database:3306
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_DEBUG: ${WP_DEBUG}
+      WORDPRESS_DEBUG_LOG: ${WP_DEBUG}
+    depends_on:
+      - database
+
+  cli:
+    image: wordpress:cli
+    container_name: ${APP_NAME}_cli
+    user: xfs
+    volumes:
+      - wp_data:/var/www/html
+      - "./local-plugins:/var/www/html/local-plugins:rw"
+    links:
+      - database:mysql
+    depends_on:
+      - database
+      - wordpress
+    command: "tail -f /dev/null"
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: ${APP_NAME}_phpmyadmin
+    volumes:
+      - "./config/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini"
+    ports:
+      - 8080:80
+    environment:
+      MYSQL_USERNAME: ${MYSQL_USERNAME}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      PMA_HOST: database
+    depends_on:
+      - database
+
+volumes:
+  db_data: {}
+  wp_data: {}
